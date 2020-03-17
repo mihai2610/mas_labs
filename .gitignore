@@ -25,3 +25,10 @@ hs_err_pid*
 *.pdf
 *.idea
 *.iml
+out/
+*/out/
+
+*/tests/
+env/
+
+*/__pycache__/
