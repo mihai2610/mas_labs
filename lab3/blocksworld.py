@@ -139,7 +139,7 @@ class PutDown(BlocksWorldAction):
 
 class Unstack(BlocksWorldAction):
     def __init__(self, target_block: Block, from_block: Block):
-        super(Unstack, self).__init__("unstack", arg1= target_block, arg2=from_block)
+        super(Unstack, self).__init__("unstack", arg1=target_block, arg2=from_block)
 
 class Stack(BlocksWorldAction):
     def __init__(self, target_block: Block, on_block: Block):
@@ -241,7 +241,7 @@ class Clear(Predicate):
 
 
 """ ======================================== Blocksworld state ======================================== """
-class BlockStack(object):
+class   BlockStack(object):
     """
     Class representing a stack of blocks in blocksworld.
     The state of the stack can be accessed as a list of predicates `getPredicates()' or directly using the
