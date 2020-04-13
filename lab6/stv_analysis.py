@@ -7,7 +7,7 @@ import collections
 
 PHIS = [0.7, 0.8, 0.9, 1.0]
 NUM_VOTERS = [100, 500, 1000]
-NUM_CANDIDATES = [3, 6, 10, 15]
+NUM_CANDIDATES = [4, 6, 10, 15]
 
 
 def generate_random_mixture(nvoters: int = 100, ncandidates: int = 6, num_refs: int = 3, phi: float = 1.0) \
@@ -45,9 +45,12 @@ def generate_random_mixture(nvoters: int = 100, ncandidates: int = 6, num_refs: 
 	return candidate_map, rmaps, rmapscounts
 
 
-def get_next_candidate(candidate: int, possible_candidates: List[int], next_candidate: Dict[int, Dict[int, int]]):
+def get_next_candidate(candidate: int, possible_candidates: List[int], next_candidates: Dict[int, Dict[int, int]]):
+	if candidate not in next_candidates:
+		return None
+
 	candidates_ranks_desc = collections.OrderedDict(
-		sorted(next_candidate[candidate].items(), key=lambda x: x[1], reverse=True))
+		sorted(next_candidates[candidate].items(), key=lambda x: x[1], reverse=True))
 
 	for possible_candidate in candidates_ranks_desc.keys():
 		if possible_candidate in possible_candidates:
@@ -74,33 +77,36 @@ def stv(nvoters: int,
 
 	threshold = float(nvoters / (required_elected + 1)) + 1
 
-	candidates_ranks = dict.fromkeys(range(1, len(canidate_map.keys()) + 1), 0)
-	next_candidate: Dict[int, Dict[int, int]] = dict()
+	candidates_ranks: Dict[int, int] = dict.fromkeys(range(1, len(canidate_map.keys()) + 1), 0)
+	next_candidates: Dict[int, Dict[int, int]] = dict()
 
 	for voter in range(len(rankings)):
 		voted_candidate = list(rankings[voter].keys())[0]
 		candidates_ranks[voted_candidate] += ranking_counts[voter]
 
-		if voted_candidate not in next_candidate:
-			next_candidate[voted_candidate] = dict.fromkeys(list(rankings[voter].keys())[1:top_k], 0)
-
 		for voter_decision in list(rankings[voter].keys())[1:top_k]:
-			next_candidate[voted_candidate][voter_decision] += rankings[voter][voter_decision] * ranking_counts[voter]
+			if voted_candidate not in next_candidates:
+				next_candidates[voted_candidate] = {}
+			if voter_decision not in next_candidates[voted_candidate]:
+				next_candidates[voted_candidate][voter_decision] = 0
 
+			next_candidates[voted_candidate][voter_decision] += rankings[voter][voter_decision] * ranking_counts[voter]
+	# 	to ask  {+= rankings[voter][voter_decision] * ranking_counts[voter]}
 	_elected_candidates = []
 
 	for candidate in candidates_ranks.copy().keys():
 		if candidates_ranks[candidate] > threshold:
 			remaining_votes = candidates_ranks[candidate] - threshold
-			next_candidate_key = max(next_candidate[candidate].items(), key=operator.itemgetter(1))[0]
-			candidates_ranks[next_candidate_key] += remaining_votes
+			next_candidate_key = get_next_candidate(candidate, list(candidates_ranks.keys()), next_candidates)
+			if next_candidate_key is not None:
+				candidates_ranks[next_candidate_key] += remaining_votes
 
 			_elected_candidates.append(candidate)
 			del candidates_ranks[candidate]
-			del next_candidate[candidate]
+			del next_candidates[candidate]
 
 	i = 0
-	while len(_elected_candidates) < required_elected and i < 1000:
+	while len(_elected_candidates) < required_elected and i < 1000 and len(candidates_ranks.keys()) > 0:
 		i += 1
 		candidates_ranks = collections.OrderedDict(
 			sorted(candidates_ranks.items(), key=lambda x: x[1], reverse=True))
@@ -108,7 +114,7 @@ def stv(nvoters: int,
 		last_candidate_key = list(candidates_ranks.keys())[-1]
 		next_candidate_key = get_next_candidate(last_candidate_key,
 												list(candidates_ranks.keys()),
-												next_candidate)
+												next_candidates)
 
 		if next_candidate_key is not None:
 			candidates_ranks[next_candidate_key] += candidates_ranks[last_candidate_key]
@@ -120,29 +126,44 @@ def stv(nvoters: int,
 				remaining_votes = candidates_ranks[candidate] - threshold
 				next_candidate_key = get_next_candidate(candidate,
 														list(candidates_ranks.keys()),
-														next_candidate)
+														next_candidates)
 				if next_candidate_key is not None:
 					candidates_ranks[next_candidate_key] += remaining_votes
 
 				_elected_candidates.append(candidate)
 				del candidates_ranks[candidate]
-				del next_candidate[candidate]
+				del next_candidates[candidate]
 
 	return _elected_candidates
 
 
 if __name__ == "__main__":
-	i = 0
-	j = 0
-	r = 3
-	p = 0
-	cmap, rmaps, rmapscounts = generate_random_mixture(nvoters=NUM_VOTERS[i],
-													   ncandidates=NUM_CANDIDATES[j],
-													   num_refs=r, phi=PHIS[p])
-	top_k = 3
-	required_elected = 2
-	elected_candidates = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, top_k, required_elected)
-	print(elected_candidates)
-	print(cmap)
-	print(rmaps)
-	print(rmapscounts)
+	# i = 0
+	# j = 0
+	# p = 0
+	num_refs = 4
+	required_elected = 4
+
+	for i in range(len(NUM_VOTERS)):
+		print(" ++++++++++++++++++++++ num_voters = ", NUM_VOTERS[i], " ++++++++++++++++++++++++++++++++++++++++++")
+		for j in range(len(NUM_CANDIDATES)):
+			spaces = " " * j * 4
+			print()
+			print(spaces, "=================== num candiates = ", NUM_CANDIDATES[j], "======================")
+			print()
+			for p in range(len(PHIS)):
+				print(spaces, "[  phi = ", PHIS[p], " ]")
+				cmap, rmaps, rmapscounts = generate_random_mixture(nvoters=NUM_VOTERS[i],
+																   ncandidates=NUM_CANDIDATES[j],
+																   num_refs=num_refs, phi=PHIS[p])
+				elected_candidates_by_all = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, NUM_CANDIDATES[j], required_elected)
+				print(spaces, "       elected considering all = ", NUM_CANDIDATES[j], " : ", elected_candidates_by_all)
+				for top_k in range(2, NUM_CANDIDATES[j]):
+					elected_candidates = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, top_k, required_elected)
+					intersection = [value for value in elected_candidates_by_all if value in elected_candidates]
+
+					print(spaces, "		elected considering top_k = ", top_k, " : ", elected_candidates,
+						  " => ", len(intersection), " coincidences : ", intersection)
+				# print(cmap)
+				# print(rmaps)
+				# print(rmapscounts)
