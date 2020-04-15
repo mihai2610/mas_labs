@@ -167,31 +167,22 @@ if __name__ == "__main__":
 	p = 0
 	num_refs = 4
 	required_elected = 4
-	spaces = ""
 	fig, axs = plt.subplots(1, 3, figsize=(9, 3), constrained_layout=True)
 	for i in range(len(NUM_VOTERS)):
-	# 	print(" ++++++++++++++++++++++ num_voters = ", NUM_VOTERS[i], " ++++++++++++++++++++++++++++++++++++++++++")
-	# 	for j in range(len(NUM_CANDIDATES)):
-	# 		spaces = " " * j * 4
-	# 		# print()
-	# 		# print(spaces, "=================== num candiates = ", NUM_CANDIDATES[j], "======================")
-	# 		# print()
-	# 		for p in range(len(PHIS)):
-	# 			print(spaces, "[  phi = ", PHIS[p], " ]")
+		# 	for j in range(len(NUM_CANDIDATES)):
+		# 		for p in range(len(PHIS)):
 		ox = list(range(2, NUM_CANDIDATES[j]))
 		oy = []
 		for top_k in range(2, NUM_CANDIDATES[j]):
 			results = []
-			for iter in range(50):
-				cmap, rmaps, rmapscounts = generate_random_mixture(nvoters=NUM_VOTERS[i],
-																   ncandidates=NUM_CANDIDATES[j],
+			for _ in range(50):
+				cmap, rmaps, rmapscounts = generate_random_mixture(nvoters=NUM_VOTERS[i], ncandidates=NUM_CANDIDATES[j],
 																   num_refs=num_refs, phi=PHIS[p])
-				elected_candidates_by_all = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, NUM_CANDIDATES[j],
-												required_elected)
-				# print(spaces, "       elected considering all = ", NUM_CANDIDATES[j], " : ", elected_candidates_by_all)
+
+				elected_by_all = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, NUM_CANDIDATES[j], required_elected)
 
 				elected_candidates = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, top_k, required_elected)
-				intersection = [value for value in elected_candidates_by_all if value in elected_candidates]
+				intersection = [value for value in elected_by_all if value in elected_candidates]
 
 				coincidences = len(intersection)
 				results.append(1 if (len(elected_candidates) - 1) <= coincidences else 0)
@@ -204,8 +195,3 @@ if __name__ == "__main__":
 		title = str(NUM_VOTERS[i]) + ' voters, ' + str(NUM_CANDIDATES[j]) + ' candidates, ' + str(PHIS[p]) + " phi"
 		axs[i].set_title(title)
 	plt.show()
-# print(spaces, "		elected considering top_k = ", top_k, " : ", elected_candidates,
-# 	  " => ", len(intersection), " coincidences : ", intersection)
-# print(cmap)
-# print(rmaps)
-# print(rmapscounts)
