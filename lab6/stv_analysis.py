@@ -4,6 +4,7 @@ from typing import List, Dict, Tuple
 import random
 import operator
 import collections
+import matplotlib.pyplot as plt
 
 PHIS = [0.7, 0.8, 0.9, 1.0]
 NUM_VOTERS = [100, 500, 1000]
@@ -59,6 +60,24 @@ def get_next_candidate(candidate: int, possible_candidates: List[int], next_cand
 	return None
 
 
+def redistribute_votes(votes_to_redistribute: int, candidate: int, possible_candidates: List[int],
+					   next_candidates: Dict[int, Dict[int, float]]) -> Dict[int, float]:
+	if candidate not in next_candidates:
+		return dict()
+
+	redistributed_votes: Dict[int, float] = dict()
+
+	total_score = sum(
+		[next_candidates[candidate][cand] for cand in possible_candidates if cand in next_candidates[candidate].keys()])
+
+	for next_candidate in next_candidates[candidate].keys():
+		if next_candidate in possible_candidates:
+			votes_prop = next_candidates[candidate][next_candidate] / total_score * votes_to_redistribute
+			redistributed_votes[next_candidate] = votes_prop
+
+	return redistributed_votes
+
+
 def stv(nvoters: int,
 		canidate_map: Dict[int, str],
 		rankings: List[Dict[int, int]],
@@ -77,8 +96,8 @@ def stv(nvoters: int,
 
 	threshold = float(nvoters / (required_elected + 1)) + 1
 
-	candidates_ranks: Dict[int, int] = dict.fromkeys(range(1, len(canidate_map.keys()) + 1), 0)
-	next_candidates: Dict[int, Dict[int, int]] = dict()
+	candidates_ranks: Dict[int, float] = dict.fromkeys(range(1, len(canidate_map.keys()) + 1), 0)
+	next_candidates: Dict[int, Dict[int, float]] = dict()
 
 	for voter in range(len(rankings)):
 		voted_candidate = list(rankings[voter].keys())[0]
@@ -97,9 +116,12 @@ def stv(nvoters: int,
 	for candidate in candidates_ranks.copy().keys():
 		if candidates_ranks[candidate] > threshold:
 			remaining_votes = candidates_ranks[candidate] - threshold
-			next_candidate_key = get_next_candidate(candidate, list(candidates_ranks.keys()), next_candidates)
-			if next_candidate_key is not None:
-				candidates_ranks[next_candidate_key] += remaining_votes
+			next_candidates_votes = redistribute_votes(remaining_votes,
+													   candidate,
+													   list(candidates_ranks.keys()),
+													   next_candidates)
+			for cand in next_candidates_votes.keys():
+				candidates_ranks[cand] += next_candidates_votes[cand]
 
 			_elected_candidates.append(candidate)
 			del candidates_ranks[candidate]
@@ -107,28 +129,30 @@ def stv(nvoters: int,
 
 	i = 0
 	while len(_elected_candidates) < required_elected and i < 1000 and len(candidates_ranks.keys()) > 0:
+
 		i += 1
 		candidates_ranks = collections.OrderedDict(
 			sorted(candidates_ranks.items(), key=lambda x: x[1], reverse=True))
 
 		last_candidate_key = list(candidates_ranks.keys())[-1]
-		next_candidate_key = get_next_candidate(last_candidate_key,
-												list(candidates_ranks.keys()),
-												next_candidates)
-
-		if next_candidate_key is not None:
-			candidates_ranks[next_candidate_key] += candidates_ranks[last_candidate_key]
+		next_candidates_votes = redistribute_votes(candidates_ranks[last_candidate_key],
+												   last_candidate_key,
+												   list(candidates_ranks.keys()),
+												   next_candidates)
+		for cand in next_candidates_votes.keys():
+			candidates_ranks[cand] += next_candidates_votes[cand]
 
 		del candidates_ranks[last_candidate_key]
 
 		for candidate in candidates_ranks.copy().keys():
 			if candidates_ranks[candidate] > threshold:
 				remaining_votes = candidates_ranks[candidate] - threshold
-				next_candidate_key = get_next_candidate(candidate,
-														list(candidates_ranks.keys()),
-														next_candidates)
-				if next_candidate_key is not None:
-					candidates_ranks[next_candidate_key] += remaining_votes
+				next_candidates_votes = redistribute_votes(remaining_votes,
+														   candidate,
+														   list(candidates_ranks.keys()),
+														   next_candidates)
+				for cand in next_candidates_votes.keys():
+					candidates_ranks[cand] += next_candidates_votes[cand]
 
 				_elected_candidates.append(candidate)
 				del candidates_ranks[candidate]
@@ -138,32 +162,50 @@ def stv(nvoters: int,
 
 
 if __name__ == "__main__":
-	# i = 0
-	# j = 0
-	# p = 0
+	i = 2
+	j = 3
+	p = 0
 	num_refs = 4
 	required_elected = 4
-
+	spaces = ""
+	fig, axs = plt.subplots(1, 3, figsize=(9, 3), constrained_layout=True)
 	for i in range(len(NUM_VOTERS)):
-		print(" ++++++++++++++++++++++ num_voters = ", NUM_VOTERS[i], " ++++++++++++++++++++++++++++++++++++++++++")
-		for j in range(len(NUM_CANDIDATES)):
-			spaces = " " * j * 4
-			print()
-			print(spaces, "=================== num candiates = ", NUM_CANDIDATES[j], "======================")
-			print()
-			for p in range(len(PHIS)):
-				print(spaces, "[  phi = ", PHIS[p], " ]")
+	# 	print(" ++++++++++++++++++++++ num_voters = ", NUM_VOTERS[i], " ++++++++++++++++++++++++++++++++++++++++++")
+	# 	for j in range(len(NUM_CANDIDATES)):
+	# 		spaces = " " * j * 4
+	# 		# print()
+	# 		# print(spaces, "=================== num candiates = ", NUM_CANDIDATES[j], "======================")
+	# 		# print()
+	# 		for p in range(len(PHIS)):
+	# 			print(spaces, "[  phi = ", PHIS[p], " ]")
+		ox = list(range(2, NUM_CANDIDATES[j]))
+		oy = []
+		for top_k in range(2, NUM_CANDIDATES[j]):
+			results = []
+			for iter in range(50):
 				cmap, rmaps, rmapscounts = generate_random_mixture(nvoters=NUM_VOTERS[i],
 																   ncandidates=NUM_CANDIDATES[j],
 																   num_refs=num_refs, phi=PHIS[p])
-				elected_candidates_by_all = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, NUM_CANDIDATES[j], required_elected)
-				print(spaces, "       elected considering all = ", NUM_CANDIDATES[j], " : ", elected_candidates_by_all)
-				for top_k in range(2, NUM_CANDIDATES[j]):
-					elected_candidates = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, top_k, required_elected)
-					intersection = [value for value in elected_candidates_by_all if value in elected_candidates]
+				elected_candidates_by_all = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, NUM_CANDIDATES[j],
+												required_elected)
+				# print(spaces, "       elected considering all = ", NUM_CANDIDATES[j], " : ", elected_candidates_by_all)
 
-					print(spaces, "		elected considering top_k = ", top_k, " : ", elected_candidates,
-						  " => ", len(intersection), " coincidences : ", intersection)
-				# print(cmap)
-				# print(rmaps)
-				# print(rmapscounts)
+				elected_candidates = stv(NUM_VOTERS[i], cmap, rmaps, rmapscounts, top_k, required_elected)
+				intersection = [value for value in elected_candidates_by_all if value in elected_candidates]
+
+				coincidences = len(intersection)
+				results.append(1 if (len(elected_candidates) - 1) <= coincidences else 0)
+
+			oy.append(results.count(1) / len(results))
+
+		axs[i].plot(ox, oy)
+		axs[i].set_ylabel('matches')
+		axs[i].set_xlabel('top_k')
+		title = str(NUM_VOTERS[i]) + ' voters, ' + str(NUM_CANDIDATES[j]) + ' candidates, ' + str(PHIS[p]) + " phi"
+		axs[i].set_title(title)
+	plt.show()
+# print(spaces, "		elected considering top_k = ", top_k, " : ", elected_candidates,
+# 	  " => ", len(intersection), " coincidences : ", intersection)
+# print(cmap)
+# print(rmaps)
+# print(rmapscounts)
