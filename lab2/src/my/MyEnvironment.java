@@ -13,6 +13,7 @@ import base.Agent;
 import base.Perceptions;
 import communication.AgentID;
 import communication.AgentMessage;
+import communication.SocialAction;
 import gridworld.GridOrientation;
 import gridworld.GridPosition;
 import hunting.AbstractHuntingEnvironment;
@@ -227,10 +228,42 @@ public class MyEnvironment extends AbstractHuntingEnvironment
 		/*
 		 * TODO: Create perceptions for predator agents.
 		 */
+		for(WildlifeAgentData predAg : getPredatorAgents())
+		{
+
+			Set<AgentMessage> myMessages = AgentMessage.filterMessagesFor(messageBox, AgentID.getAgentID(predAg.getAgent()));
+
+			Set<GridPosition> nearbyObstacles = getNearbyObstacles(predAg.getPosition(), my.MyTester.PREDATOR_RANGE);
+
+			Set<GridPosition> preyPositions = new HashSet<>();
+			for(WildlifeAgentData prey : getNearbyPrey(predAg.getPosition(), my.MyTester.PREDATOR_RANGE))
+				preyPositions.add(prey.getPosition());
+
+			Map<AgentID, GridPosition> predatorPositions = new HashMap<>();
+			for(WildlifeAgentData pred : getNearbyPredators(predAg.getPosition(), MyTester.PREDATOR_RANGE, null))
+				if(!pred.equals(predAg)) {
+					predatorPositions.put(AgentID.getAgentID(pred.getAgent()), pred.getPosition());
+				}
+			agentPerceptions.put(predAg,
+					new MyPerceptions(predAg.getPosition(), nearbyObstacles, predatorPositions, preyPositions, myMessages));
+
+
+		}
+
+		messageBox.clear();
 		
 		// STAGE 2: call response for each agent, in order to obtain desired actions
+
+		Map<GridAgentData, SocialAction> agentActions = new HashMap<>();
+
+		for(WildlifeAgentData agent : getPreyAgents()) {
+			agentActions.put(agent, new SocialAction((MyAction)agent.getAgent().response(agentPerceptions.get(agent))));
+		}
+
+		for(WildlifeAgentData agent : getPredatorAgents()) {
+			agentActions.put(agent, (SocialAction) agent.getAgent().response(agentPerceptions.get(agent)));
+		}
 		
-		Map<GridAgentData, MyAction> agentActions = new HashMap<>();
 		/*
 		 * TODO: Get actions for all agents.
 		 */
@@ -252,7 +285,8 @@ public class MyEnvironment extends AbstractHuntingEnvironment
 			else
 			{
 				GridPosition newPosition = null;
-				switch(agentActions.get(agentData))
+				messageBox.addAll(agentActions.get(agentData).getOutgoingMessages());
+				switch(agentActions.get(agentData).getPhysicalAction())
 				{
 				case NORTH:
 					newPosition = agentData.getPosition().getNeighborPosition(GridOrientation.NORTH);
