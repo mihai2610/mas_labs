@@ -1,5 +1,7 @@
 from environment import *
 from random import choice
+
+
 if __name__ == "__main__":
     TEST_SUITE = "tests/0a/"
 
@@ -14,6 +16,10 @@ if __name__ == "__main__":
 
     available_actions = [NoAction(), Unstack(Block("A"), Block("B")), PutDown(Block("A")), PickUp(Block("B")),
                          Stack(Block("B"), Block("C"))]
+
+
+
+
 
     for i in range(100):
         print("=============== STEP %i ===============" % i)
